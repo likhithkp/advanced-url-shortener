@@ -1,61 +1,30 @@
+const redisClient = require("../../../redisClient");
 const { createShortUrl } = require("../../services/url/urlServices");
 const crypto = require("crypto");
-
-const isValidUrl = (url) => {
-    try {
-        new URL(url);
-        return true;
-    } catch (err) {
-        return false;
-    }
-};
 
 const shortenUrl = async (req, res) => {
     const { url } = req.body;
 
     try {
         if (!url) {
-            return res.status(400).json({
-                status: 400,
-                data: null,
-                message: "URL missing",
-                error: null
-            });
+            return res.status(400).json({ status: 400, message: "URL missing" });
         }
 
-        if (!isValidUrl(url)) {
-            return res.status(400).json({
-                status: 400,
-                data: null,
-                message: "Invalid URL format",
-                error: null
-            });
+        const cachedShortCode = await redisClient.get(url);
+        if (cachedShortCode) {
+            return res.status(200).json({ status: 200, shortCode: cachedShortCode, message: "URL already exists" });
         }
 
         const shortCode = crypto.randomBytes(4).toString("hex");
-        const newURL = await createShortUrl({ url_code: shortCode, url });
 
-        if (newURL && !newURL.error) {
-            return res.status(201).json({
-                status: 201,
-                data: { shortCode },
-                message: "URL shortened successfully",
-                error: null
-            });
-        } else {
-            return res.status(400).json({
-                status: 400,
-                data: null,
-                message: "Bad Request",
-                error: newURL?.error || "Unknown error"
-            });
-        }
+        await createShortUrl({ url_code: shortCode, url });
+
+        await redisClient.set(url, shortCode, "EX", 3600);
+
+        return res.status(201).json({ status: 201, shortCode, message: "URL shortened successfully" });
+
     } catch (error) {
-        res.status(500).json({ 
-            status: 500,
-            error: "Error creating short URL", 
-            details: error.message 
-        });
+        res.status(500).json({ error: "Error creating short URL", details: error.message });
     }
 };
 

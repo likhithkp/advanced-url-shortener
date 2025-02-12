@@ -33,4 +33,19 @@ async function getUrlByCode(data) {
     }
 }
 
-module.exports = { createShortUrl, getUrlByCode };
+async function findUrlByOriginal(originalUrl) {
+    try {
+        const existingUrl = await urls.findOne({
+            where: { url: originalUrl }
+        });
+
+        return existingUrl ? existingUrl : null;
+    } catch (error) {
+        return {
+            message: "Error finding URL.",
+            error: error.message,
+        };
+    }
+}
+
+module.exports = { createShortUrl, getUrlByCode, findUrlByOriginal };
